@@ -1,0 +1,5 @@
+# api/requirements.txt
+
+flask
+psycopg2-binary
+python-dotenv
