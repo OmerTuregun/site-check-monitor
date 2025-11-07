@@ -1,0 +1,5 @@
+# checker/requirements.txt
+
+psycopg2-binary
+python-dotenv
+requests
