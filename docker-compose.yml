@@ -1,0 +1,69 @@
+version: '3.8' # Docker Compose sürümünü belirtir
+
+services:
+  # 1. Veritabanı Servisi (PostgreSQL)
+  db:
+    image: postgres:14-alpine # Hafif bir Postgres imajı kullan
+    container_name: site-check-db
+    environment:
+      # Veritabanı için kullanıcı adı, şifre ve veritabanı adı
+      # BUNLARI GÜVENLİ BİR YERDE SAKLA (şimdilik burada)
+      POSTGRES_USER: sitecheck_user
+      POSTGRES_PASSWORD: sitecheck_password
+      POSTGRES_DB: sitecheck_db
+    volumes:
+      # 'postgres-data' adında bir 'named volume' kullan
+      # Bu sayede konteyner silinse bile veritabanı verimiz kaybolmaz
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      # Veritabanının gerçekten 'hazır' olup olmadığını kontrol et
+      test: ["CMD-SHELL", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 2. API Servisi (Python/Flask)
+  api:
+    build: ./api # 'api' klasöründeki Dockerfile'ı build et
+    container_name: site-check-api
+    ports:
+      # Bilgisayarımızın 5000 portunu konteynerin 5000 portuna bağla
+      - "5000:5000"
+    environment:
+      # Veritabanı bağlantı bilgilerini API'ye ver
+      # HOST=db -> 'db' servis adını (yukarıda tanımladık) kullan
+      DB_HOST: db
+      DB_USER: ${POSTGRES_USER} # Değişkenleri yukarıdan al
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: ${POSTGRES_DB}
+    depends_on:
+      db:
+        condition: service_healthy # 'db' servisi 'healthy' (sağlıklı) olmadan başlama
+
+  # 3. Checker Servisi (Python Worker)
+  checker:
+    build: ./checker # 'checker' klasöründeki Dockerfile'ı build et
+    container_name: site-check-checker
+    environment:
+      # Bu servis de veritabanına bağlanacak
+      DB_HOST: db
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: ${POSTGRES_DB}
+    depends_on:
+      db:
+        condition: service_healthy # 'db' servisi 'healthy' olmadan başlama
+
+  # 4. Frontend Servisi (React/Nginx)
+  frontend:
+    build: ./frontend # 'frontend' klasöründeki Dockerfile'ı build et
+    container_name: site-check-frontend
+    ports:
+      # Bilgisayarımızın 3000 portunu konteynerin 80 portuna (Nginx) bağla
+      - "3000:80"
+    depends_on:
+      - api # 'api' servisi başlamadan 'frontend' başlamasın
+
+# Veritabanı verisini kalıcı kılmak için kullanılacak 'volume'ü tanımla
+volumes:
+  postgres-data:
