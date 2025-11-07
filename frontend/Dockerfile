@@ -27,6 +27,9 @@ FROM nginx:1.23-alpine
 # Nginx'in yayın yapacağı varsayılan klasöre (/usr/share/nginx/html) kopyala
 COPY --from=build /app/build /usr/share/nginx/html
 
+RUN rm /etc/nginx/conf.d/default.conf
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
 # Nginx'in 80 portundan yayın yapacağını belirt (varsayılan)
 EXPOSE 80
 
