@@ -1,0 +1,81 @@
+# .github/workflows/ci.yml
+
+name: Build and Push to ECR
+
+# Bu otomasyonu ne zaman tetikleyeceğimizi belirler
+on:
+  # 1. 'main' dalına her 'push' (veya merge) yapıldığında çalış
+  push:
+    branches: [ "main" ]
+  # 2. GitHub Actions arayüzünden manuel olarak da tetikleyebilmek için
+  workflow_dispatch:
+
+# Bu workflow için gerekli ortam değişkenleri
+env:
+  AWS_REGION: eu-north-1            # SİZİN BÖLGENİZ (eu-north-1)
+  AWS_ACCOUNT_ID: 440913952486      # SİZİN HESAP ID'NİZ (440913952486)
+  ECR_REPO_API: site-check-api      # ECR'da oluşturduğumuz depoların adları
+  ECR_REPO_FRONTEND: site-check-frontend
+  ECR_REPO_CHECKER: site-check-checker
+
+jobs:
+  # 'build-and-push' adında TEK bir iş (job) tanımlıyoruz
+  build-and-push:
+    name: Build and Push Images
+    # Bu iş 'ubuntu' (Linux) bir sanal makinede çalışacak
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Adım: GitHub reponuzdaki kodları sanal makineye indir
+      - name: Kodu indir (Check out code)
+        uses: actions/checkout@v4
+
+      # 2. Adım: AWS kimlik bilgilerini ayarla
+      # Bu adım, GitHub Secrets'a kaydettiğiniz (AWS_ACCESS_KEY_ID ve AWS_SECRET_ACCESS_KEY) 
+      # anahtarları güvenli bir şekilde kullanır.
+      - name: AWS kimlik bilgilerini ayarla
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # 3. Adım: AWS ECR'a (imaj garajımıza) giriş yap
+      - name: Amazon ECR'a giriş yap
+        id: login-ecr
+        uses: aws-actions/aws-ecr-login@v2
+
+      # 4. Adım: Docker Buildx'i kur (gerekli bir araç)
+      - name: Docker Buildx'i kur
+        uses: docker/setup-buildx-action@v3
+
+      # 5. Adım: API İmajını Build Et ve ECR'a Push'la
+      - name: API imajını build et ve push'la
+        uses: docker/build-push-action@v5
+        with:
+          context: ./api  # 'api' klasöründeki Dockerfile'ı kullan
+          push: true
+          # İmajın tam adını oluştur: 12345.dkr.ecr.eu-north-1.amazonaws.com/site-check-api:latest
+          tags: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPO_API }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # 6. Adım: FRONTEND İmajını Build Et ve ECR'a Push'la
+      - name: FRONTEND imajını build et ve push'la
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend # 'frontend' klasöründeki Dockerfile'ı kullan
+          push: true
+          tags: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPO_FRONTEND }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # 7. Adım: CHECKER İmajını Build Et ve ECR'a Push'la
+      - name: CHECKER imajını build et ve push'la
+        uses: docker/build-push-action@v5
+        with:
+          context: ./checker # 'checker' klasöründeki Dockerfile'ı kullan
+          push: true
+          tags: ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPO_CHECKER }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
