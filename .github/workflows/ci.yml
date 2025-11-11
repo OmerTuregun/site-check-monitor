@@ -2,6 +2,8 @@
 
 name: Build and Push to ECR
 
+# TRIGGER RUN (v2) - Bu satırı biz ekledik
+
 # Bu otomasyonu ne zaman tetikleyeceğimizi belirler
 on:
   # 1. 'main' dalına her 'push' (veya merge) yapıldığında çalış
